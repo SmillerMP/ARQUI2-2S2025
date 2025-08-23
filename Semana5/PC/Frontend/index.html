@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Relé - MQTT</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .status-card {
+            background: linear-gradient(145deg, #f0f2f5, #ffffff);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .relay-controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            min-width: 120px;
+        }
+
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover:before {
+            left: 100%;
+        }
+
+        .btn-on {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-on:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
+        }
+
+        .btn-off {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+            color: white;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        }
+
+        .btn-off:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .relay-status {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background: linear-gradient(145deg, #e9ecef, #f8f9fa);
+        }
+
+        .relay-on {
+            color: #28a745;
+        }
+
+        .relay-off {
+            color: #dc3545;
+        }
+
+        .logs {
+            background: #1e1e1e;
+            color: #fff;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            text-align: left;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.8em;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            .relay-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Control de Relé</h1>
+        
+        <div class="status-card">
+            <div class="connection-status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="connectionStatus">Desconectado</span>
+            </div>
+            
+            <div class="relay-status" id="relayStatus">
+                Estado: <span id="relayState">Desconocido</span>
+            </div>
+        </div>
+
+        <div class="relay-controls">
+            <button class="btn btn-on" id="btnOn" onclick="sendCommand('RELE_ON')" disabled>
+                🔛 Encender
+            </button>
+            <button class="btn btn-off" id="btnOff" onclick="sendCommand('RELE_OFF')" disabled>
+                🔴 Apagar
+            </button>
+        </div>
+
+        <div class="logs" id="logs">
+            <div class="log-entry">
+                <span class="timestamp">[Sistema]</span> Iniciando conexión MQTT...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración MQTT (usando la misma configuración que funciona)
+        const broker = "ws://143.198.53.172:9001"; // WebSocket en Mosquitto
+        const options = {
+            username: "smillermp",
+            password: "test",
+            clientId: "webclient-" + Math.random().toString(16).substr(2, 8)
+        };
+        const TOPIC_CMD = "silo/control";
+        const TOPIC_STATUS = "silo/estado";
+
+        // Variables globales
+        let client = null;
+        let isConnected = false;
+
+        // Referencias DOM
+        const statusIndicator = document.getElementById('statusIndicator');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const relayState = document.getElementById('relayState');
+        const relayStatus = document.getElementById('relayStatus');
+        const btnOn = document.getElementById('btnOn');
+        const btnOff = document.getElementById('btnOff');
+        const logs = document.getElementById('logs');
+
+        // Función para agregar logs
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            let prefix = '[INFO]';
+            if (type === 'error') prefix = '[ERROR]';
+            else if (type === 'success') prefix = '[OK]';
+            else if (type === 'command') prefix = '[CMD]';
+            
+            logEntry.innerHTML = `<span class="timestamp">${timestamp} ${prefix}</span> ${message}`;
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+
+            // Mantener solo las últimas 50 entradas
+            while (logs.children.length > 50) {
+                logs.removeChild(logs.firstChild);
+            }
+        }
+
+        // Función para actualizar el estado de la conexión
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            
+            if (connected) {
+                statusIndicator.classList.add('connected');
+                connectionStatus.textContent = 'Conectado';
+                btnOn.disabled = false;
+                btnOff.disabled = false;
+                addLog('Conectado al broker MQTT', 'success');
+            } else {
+                statusIndicator.classList.remove('connected');
+                connectionStatus.textContent = 'Desconectado';
+                btnOn.disabled = true;
+                btnOff.disabled = true;
+                relayState.textContent = 'Desconocido';
+                relayStatus.className = 'relay-status';
+                addLog('Desconectado del broker MQTT', 'error');
+            }
+        }
+
+        // Función para actualizar el estado del relé
+        function updateRelayStatus(status) {
+            relayState.textContent = status;
+            
+            if (status.toLowerCase().includes('on') || status.toLowerCase().includes('encendido') || status.toLowerCase().includes('rele_on')) {
+                relayStatus.className = 'relay-status relay-on';
+            } else if (status.toLowerCase().includes('off') || status.toLowerCase().includes('apagado') || status.toLowerCase().includes('rele_off')) {
+                relayStatus.className = 'relay-status relay-off';
+            } else {
+                relayStatus.className = 'relay-status';
+            }
+        }
+
+        // Función para enviar comandos
+        function sendCommand(command) {
+            if (!isConnected) {
+                addLog('No conectado al broker', 'error');
+                return;
+            }
+
+            try {
+                client.publish(TOPIC_CMD, command);
+                addLog(`Comando enviado: ${command}`, 'command');
+            } catch (error) {
+                addLog(`Error enviando comando: ${error.message}`, 'error');
+            }
+        }
+
+        // Función para conectar al broker MQTT
+        function connectMQTT() {
+            try {
+                addLog('Intentando conectar al broker...', 'info');
+                
+                // Crear cliente MQTT usando mqtt.js (igual que la versión que funciona)
+                client = mqtt.connect(broker, options);
+
+                // Configurar callbacks
+                client.on("connect", () => {
+                    console.log("Conectado al broker por WebSockets");
+                    updateConnectionStatus(true);
+                    
+                    // Suscribirse al topic de estado
+                    client.subscribe(TOPIC_STATUS);
+                    addLog(`Suscrito a ${TOPIC_STATUS}`, 'success');
+                });
+
+                client.on("message", (topic, message) => {
+                    if (topic === TOPIC_STATUS) {
+                        const payload = message.toString();
+                        updateRelayStatus(payload);
+                        addLog(`Estado recibido: ${payload}`, 'info');
+                    }
+                });
+
+                client.on("error", (error) => {
+                    console.error("Error MQTT:", error);
+                    updateConnectionStatus(false);
+                    addLog(`Error MQTT: ${error.message}`, 'error');
+                });
+
+                client.on("close", () => {
+                    console.log("Conexión MQTT cerrada");
+                    updateConnectionStatus(false);
+                });
+
+                client.on("offline", () => {
+                    console.log("Cliente MQTT offline");
+                    updateConnectionStatus(false);
+                    addLog('Cliente offline', 'error');
+                });
+
+            } catch (error) {
+                addLog(`Error inicializando MQTT: ${error.message}`, 'error');
+                updateConnectionStatus(false);
+            }
+        }
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', function() {
+            addLog('Aplicación iniciada', 'info');
+            connectMQTT();
+        });
+
+        // Manejar cierre de ventana
+        window.addEventListener('beforeunload', function() {
+            if (client && isConnected) {
+                client.end();
+            }
+        });
+    </script>
+</body>
+</html>
