@@ -5,8 +5,8 @@ from paho.mqtt.client import Client, CallbackAPIVersion
 
 # pines GPIO
 GPIO.setmode(GPIO.BOARD)
-PIN_RELAY = 15
-PIN_BUTTON = 16
+PIN_RELAY = 11
+PIN_BUTTON = 12
 
 # definir los tipos de pines
 GPIO.setup(PIN_RELAY, GPIO.OUT)  # pin del relé
@@ -40,8 +40,8 @@ def lecturaBoton():
             GPIO.output(PIN_RELAY, not GPIO.input(PIN_RELAY))
             estado_rele = "RELE_ON" if GPIO.input(PIN_RELAY) else "RELE_OFF"
             
-            # Publicar estado
-            client.publish(TOPIC_STATUS, estado_rele)
+            # Publicar estado con mensaje retenido
+            client.publish(TOPIC_STATUS, estado_rele, retain=True)
             print(f"Botón presionado. Estado del relé: {estado_rele}")
 
             # Debounce
@@ -55,11 +55,11 @@ def lecturaComando(comando):
     """Procesar comandos MQTT"""
     if comando == "RELE_ON":
         GPIO.output(PIN_RELAY, GPIO.HIGH)
-        client.publish(TOPIC_STATUS, "RELE_ON")
+        client.publish(TOPIC_STATUS, "RELE_ON", retain=True)
         print("--> Relé ENCENDIDO")
     elif comando == "RELE_OFF":
         GPIO.output(PIN_RELAY, GPIO.LOW)
-        client.publish(TOPIC_STATUS, "RELE_OFF")
+        client.publish(TOPIC_STATUS, "RELE_OFF", retain=True)
         print("--> Relé APAGADO")
     else:
         print("--> Comando no reconocido:", comando)
@@ -68,6 +68,11 @@ def lecturaComando(comando):
 def on_connect(client, userdata, flags, reasonCode, properties=None):
     print("Conectado al broker con código:", reasonCode)
     client.subscribe(TOPIC_CMD)  # escuchar comandos
+    
+    # Publicar estado inicial del relé al conectarse
+    estado_inicial = "RELE_ON" if GPIO.input(PIN_RELAY) else "RELE_OFF"
+    client.publish(TOPIC_STATUS, estado_inicial, retain=True)
+    print(f"Estado inicial publicado: {estado_inicial}")
 
 def on_message(client, userdata, msg):
     comando = msg.payload.decode()
