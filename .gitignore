@@ -1,3 +1,19 @@
 *.fzz
 *.zip
 
+/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.env
+.vscode/
+.idea/
+.DS_Store
+.envrc
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/       
