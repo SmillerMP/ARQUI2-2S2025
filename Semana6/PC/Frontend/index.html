@@ -233,10 +233,10 @@
 
     <script>
         // Configuración MQTT (usando la misma configuración que funciona)
-        const broker = "ws://143.198.53.172:9001"; // WebSocket en Mosquitto
+        const broker = "ws://192.168.1.5:9001"; // WebSocket en Mosquitto
         const options = {
             username: "smillermp",
-            password: "test",
+            password: "arqui2",
             clientId: "webclient-" + Math.random().toString(16).substr(2, 8)
         };
         const TOPIC_CMD = "silo/control";
